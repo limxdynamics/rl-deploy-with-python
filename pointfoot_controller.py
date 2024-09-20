@@ -61,6 +61,10 @@ class PointfootController:
         self.imu_data_callback_partial = partial(self.imu_data_callback)
         self.robot.subscribeImuData(self.imu_data_callback_partial)
 
+        # Set up a callback to receive updated SensorJoy
+        self.sensor_joy_callback_partial = partial(self.sensor_joy_callback)
+        self.robot.subscribeSensorJoy(self.sensor_joy_callback_partial)
+
     # Load the configuration from a YAML file
     def load_config(self, config_file):
         with open(config_file, 'r') as f:
@@ -294,6 +298,12 @@ class PointfootController:
         self.imu_data.quat[1] = imu_data.quat[2]
         self.imu_data.quat[2] = imu_data.quat[3]
         self.imu_data.quat[3] = imu_data.quat[0]
+
+    # Callback function for receiving sensor joy data
+    def sensor_joy_callback(self, sensor_joy: datatypes.SensorJoy):
+        self.commands[0] = sensor_joy.axes[1] * 0.5
+        self.commands[1] = sensor_joy.axes[0] * 0.5
+        self.commands[2] = sensor_joy.axes[2] * 0.5
 
 if __name__ == '__main__':
     # Get the robot type from the environment variable
