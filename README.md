@@ -114,8 +114,6 @@
   ./rl-deploy-with-python/robot-joystick/robot-joystick
   ```
 
-​		![](doc/joystick.png)
-
 ## 4. 效果展示
 ![](doc/simulator.gif)
 
