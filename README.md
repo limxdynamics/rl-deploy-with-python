@@ -6,7 +6,7 @@
 
 - 打开一个 Bash 终端。
 
-- 下载 MuJoCo 仿真器代码：
+- 下载 MuJoCo 仿真器代码： 
 
   ```
   git clone --recurse https://github.com/limxdynamics/pointfoot-mujoco-sim.git
