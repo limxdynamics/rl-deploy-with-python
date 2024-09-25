@@ -111,7 +111,7 @@
 - 运行 robot-joystick：
 
   ```
-  ./rl-deploy-with-python/robot-joystick/robot-joystick
+  ./pointfoot-mujoco-sim/robot-joystick/robot-joystick
   ```
 
 ## 4. 效果展示
