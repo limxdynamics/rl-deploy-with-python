@@ -3,6 +3,7 @@ import sys
 import copy
 import numpy as np
 import yaml
+import time
 import onnxruntime as ort
 from scipy.spatial.transform import Rotation as R
 from functools import partial
@@ -13,7 +14,7 @@ import limxsdk.robot.RobotType as RobotType
 import limxsdk.datatypes as datatypes
 
 class PointfootController:
-    def __init__(self, model_dir, robot, robot_type):
+    def __init__(self, model_dir, robot, robot_type, start_controller):
         # Initialize robot and type information
         self.robot = robot
         self.robot_type = robot_type
@@ -65,6 +66,16 @@ class PointfootController:
         self.sensor_joy_callback_partial = partial(self.sensor_joy_callback)
         self.robot.subscribeSensorJoy(self.sensor_joy_callback_partial)
 
+        # Set up a callback to receive diagnostic data
+        self.robot_diagnostic_callback_partial = partial(self.robot_diagnostic_callback)
+        self.robot.subscribeDiagnosticValue(self.robot_diagnostic_callback_partial)
+
+        # Initialize the calibration state to -1, indicating no calibration has occurred.
+        self.calibration_state = -1
+
+        # Flag to start the controller
+        self.start_controller = start_controller
+
     # Load the configuration from a YAML file
     def load_config(self, config_file):
         with open(config_file, 'r') as f:
@@ -107,6 +118,10 @@ class PointfootController:
 
     # Main control loop
     def run(self):
+        # Wait until the controller is started
+        while not self.start_controller:
+          time.sleep(1)
+
         # Initialize default joint angles for standing
         self.default_joint_angles = np.array([0.0] * len(self.joint_names))
         self.stand_percent += 1 / (self.stand_duration * self.loop_frequency)
@@ -115,9 +130,18 @@ class PointfootController:
 
         # Set the loop rate based on the frequency in the configuration
         rate = Rate(self.loop_frequency)
-        while True:
+        while self.start_controller:
             self.update()
             rate.sleep()
+        
+        # Reset robot command values to ensure a safe stop when exiting the loop
+        self.robot_cmd.q = [0. for x in range(0, self.joint_num)]
+        self.robot_cmd.dq = [0. for x in range(0, self.joint_num)]
+        self.robot_cmd.tau = [0. for x in range(0, self.joint_num)]
+        self.robot_cmd.Kp = [0. for x in range(0, self.joint_num)]
+        self.robot_cmd.Kd = [1.0 for x in range(0, self.joint_num)]
+        self.robot.publishRobotCmd(self.robot_cmd)
+        time.sleep(1)
 
     # Handle the stand mode for smoothly transitioning the robot into standing
     def handle_stand_mode(self):
@@ -301,9 +325,26 @@ class PointfootController:
 
     # Callback function for receiving sensor joy data
     def sensor_joy_callback(self, sensor_joy: datatypes.SensorJoy):
+        # Check if the robot is in the calibration state and both L1 (button index 4) and Y (button index 3) buttons are pressed.
+        if not self.start_controller and self.calibration_state == 0 and sensor_joy.buttons[4] == 1 and sensor_joy.buttons[3] == 1:
+          print(f"L1 + Y: start_controller...")
+          self.start_controller = True
+
+        # Check if both L1 (button index 4) and X (button index 2) are pressed to stop the controller
+        if self.start_controller and sensor_joy.buttons[4] == 1 and sensor_joy.buttons[2] == 1:
+          print(f"L1 + X: stop_controller...")
+          self.start_controller = False
+
         self.commands[0] = sensor_joy.axes[1] * 0.5
         self.commands[1] = sensor_joy.axes[0] * 0.5
         self.commands[2] = sensor_joy.axes[2] * 0.5
+
+    # Callback function for receiving diagnostic data
+    def robot_diagnostic_callback(self, diagnostic_value: datatypes.DiagnosticValue):
+      # Check if the received diagnostic data is related to calibration.
+      if diagnostic_value.name == "calibration":
+        print(f"Calibration state: {diagnostic_value.code}")
+        self.calibration_state = diagnostic_value.code
 
 if __name__ == '__main__':
     # Get the robot type from the environment variable
@@ -328,6 +369,9 @@ if __name__ == '__main__':
     if not robot.init(robot_ip):
         sys.exit()
 
+    # Determine if the simulation is running
+    start_controller = robot_ip == "127.0.0.1"
+
     # Create and run the PointfootController
-    controller = PointfootController(f'{os.path.dirname(os.path.abspath(__file__))}/model/pointfoot', robot, robot_type)
+    controller = PointfootController(f'{os.path.dirname(os.path.abspath(__file__))}/model/pointfoot', robot, robot_type, start_controller)
     controller.run()
