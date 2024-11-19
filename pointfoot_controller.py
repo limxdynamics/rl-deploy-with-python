@@ -18,6 +18,10 @@ class PointfootController:
         # Initialize robot and type information
         self.robot = robot
         self.robot_type = robot_type
+        self.is_point_foot = self.robot_type.startswith("PF")
+        self.is_wheel_foot = self.robot_type.startswith("WF")
+        self.is_sole_foot = self.robot_type.startswith("SF")
+
         # Load configuration and model file paths based on robot type
         self.config_file = f'{model_dir}/{self.robot_type}/params.yaml'
         self.model_file = f'{model_dir}/{self.robot_type}/policy/policy.onnx'
@@ -108,6 +112,11 @@ class PointfootController:
         self.joint_num = len(self.joint_names)  # number of joints
         self.commands = np.zeros(3)
 
+        if self.is_wheel_foot:
+          self.joint_pos_idxs = config['PointfootCfg']['size']['jointpos_idxs']
+          self.wheel_joint_damping = config['PointfootCfg']['control']['wheel_joint_damping']
+          self.wheel_joint_torque_limit = config['PointfootCfg']['control']['wheel_joint_torque_limit']
+
         # Initialize joint angles based on the initial configuration
         self.init_joint_angles = np.zeros(len(self.joint_names))
         for i in range(len(self.joint_names)):
@@ -149,7 +158,7 @@ class PointfootController:
             for j in range(len(self.joint_names)):
                 # Interpolate between initial and default joint angles during stand mode
                 pos_des = self.default_joint_angles[j] * (1 - self.stand_percent) + self.init_state[self.joint_names[j]] * self.stand_percent
-                self.set_joint_command(j, pos_des)
+                self.set_joint_command(j, pos_des, 0, 0, self.control_cfg['stiffness'], self.control_cfg['damping'])
             # Increment the stand percentage over time
             self.stand_percent += 1 / (self.stand_duration * self.loop_frequency)
         else:
@@ -176,25 +185,34 @@ class PointfootController:
         joint_vel = np.array(self.robot_state_tmp.dq)
 
         for i in range(len(joint_pos)):
-            # Compute the limits for the action based on joint position and velocity
-            action_min = (joint_pos[i] - self.init_joint_angles[i] +
-                          (self.control_cfg['damping'] * joint_vel[i] - self.control_cfg['user_torque_limit']) /
-                          self.control_cfg['stiffness'])
-            action_max = (joint_pos[i] - self.init_joint_angles[i] +
-                          (self.control_cfg['damping'] * joint_vel[i] + self.control_cfg['user_torque_limit']) /
-                          self.control_cfg['stiffness'])
+            if self.is_point_foot or (i + 1) % 4 != 0:
+                # Compute the limits for the action based on joint position and velocity
+                action_min = (joint_pos[i] - self.init_joint_angles[i] +
+                              (self.control_cfg['damping'] * joint_vel[i] - self.control_cfg['user_torque_limit']) /
+                              self.control_cfg['stiffness'])
+                action_max = (joint_pos[i] - self.init_joint_angles[i] +
+                              (self.control_cfg['damping'] * joint_vel[i] + self.control_cfg['user_torque_limit']) /
+                              self.control_cfg['stiffness'])
 
-            # Clip action within limits
-            self.actions[i] = max(action_min / self.control_cfg['action_scale_pos'],
-                                  min(action_max / self.control_cfg['action_scale_pos'], self.actions[i]))
+                # Clip action within limits
+                self.actions[i] = max(action_min / self.control_cfg['action_scale_pos'],
+                                      min(action_max / self.control_cfg['action_scale_pos'], self.actions[i]))
 
-            # Compute the desired joint position and set it
-            pos_des = self.actions[i] * self.control_cfg['action_scale_pos'] + self.init_joint_angles[i]
-            self.set_joint_command(i, pos_des)
+                # Compute the desired joint position and set it
+                pos_des = self.actions[i] * self.control_cfg['action_scale_pos'] + self.init_joint_angles[i]
+                self.set_joint_command(i, pos_des, 0, 0, self.control_cfg['stiffness'], self.control_cfg['damping'])
 
-            # Save the last action for reference
-            self.last_actions[i] = self.actions[i]
-    
+                # Save the last action for reference
+                self.last_actions[i] = self.actions[i]
+            elif self.is_wheel_foot:
+                action_min = joint_vel[i] - self.wheel_joint_torque_limit / self.wheel_joint_damping
+                action_max = joint_vel[i] + self.wheel_joint_torque_limit / self.wheel_joint_damping
+                self.last_actions[i] = self.actions[i]
+                self.actions[i] = max(action_min / self.wheel_joint_damping,
+                                      min(action_max / self.wheel_joint_damping, self.actions[i]))
+                velocity_des = self.actions[i] * self.wheel_joint_damping
+                self.set_joint_command(i, 0, velocity_des, 0, 0, self.wheel_joint_damping)
+
     def compute_observation(self):
         # Convert IMU orientation from quaternion to Euler angles (ZYX convention)
         imu_orientation = np.array(self.imu_data_tmp.quat)
@@ -229,6 +247,15 @@ class PointfootController:
         # Apply scaling to the command inputs (velocity commands)
         scaled_commands = np.dot(command_scaler, self.commands)
 
+        # Populate observation vector
+        joint_pos_value = (joint_positions - self.init_joint_angles) * self.obs_scales['dof_pos']
+
+        # In WF, joint pos does not include wheel speed, index(3, 7) needs to be removed
+        if self.is_wheel_foot:
+            joint_pos_input = np.array([joint_pos_value[idx] for idx in self.joint_pos_idxs])
+        else:
+            joint_pos_input = joint_pos_value
+
         # Create the observation vector by concatenating various state variables:
         # - Base angular velocity (scaled)
         # - Projected gravity vector
@@ -239,7 +266,7 @@ class PointfootController:
         obs = np.concatenate([
             base_ang_vel * self.obs_scales['ang_vel'],  # Scaled base angular velocity
             projected_gravity,  # Projected gravity vector in body frame
-            (joint_positions - self.init_joint_angles) * self.obs_scales['dof_pos'],  # Scaled joint positions
+            joint_pos_input,  # Scaled joint positions
             joint_velocities * self.obs_scales['dof_vel'],  # Scaled joint velocities
             actions,  # Last actions taken by the robot
             scaled_commands  # Scaled velocity commands from user input
@@ -269,16 +296,25 @@ class PointfootController:
         # Flatten the output and store it as actions
         self.actions = np.array(output).flatten()
         
-    def set_joint_command(self, joint_index, position):
+    def set_joint_command(self, joint_index, q, dq, tau, kp, kd):
         """
-        Sends a command to set a joint to the desired position.
-        Replace this method with actual implementation according to your hardware.
-        
+        Sends a command to configure the state of a specific joint.
+        This method updates the joint's desired position, velocity, torque, and control gains.
+        Replace this implementation with the actual communication logic for your hardware.
+
         Parameters:
-        joint_index (int): The index of the joint to command.
-        position (float): The desired position of the joint.
+        joint_index (int): The index of the joint to be controlled.
+        q (float): The desired joint position, typically in radians or degrees.
+        dq (float): The desired joint velocity, typically in radians/second or degrees/second.
+        tau (float): The desired joint torque, typically in Newton-meters (Nm).
+        kp (float): The proportional gain for position control.
+        kd (float): The derivative gain for velocity control.
         """
-        self.robot_cmd.q[joint_index] = position
+        self.robot_cmd.q[joint_index] = q
+        self.robot_cmd.dq[joint_index] = dq
+        self.robot_cmd.tau[joint_index] = tau
+        self.robot_cmd.Kp[joint_index] = kp
+        self.robot_cmd.Kd[joint_index] = kd
 
     def update(self):
         """

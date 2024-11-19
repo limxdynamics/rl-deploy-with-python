@@ -4,9 +4,11 @@ PointfootCfg:
     - "abad_L_Joint"
     - "hip_L_Joint"
     - "knee_L_Joint"
+    - "wheel_L_Joint"
     - "abad_R_Joint"
     - "hip_R_Joint"
     - "knee_R_Joint"
+    - "wheel_R_Joint"
   
   init_state:
     # target angles [rad] when action = 0.0
@@ -14,18 +16,22 @@ PointfootCfg:
       abad_L_Joint: 0.0
       hip_L_Joint: 0.0
       knee_L_Joint: 0.0
+      wheel_L_Joint: 0.0
 
       abad_R_Joint: 0.0
       hip_R_Joint: 0.0
       knee_R_Joint: 0.0
+      wheel_R_Joint: 0.0
 
   control:
     # PD Drive parameters:
     stiffness: 40.0
     damping: 2.0
+    wheel_joint_damping: 0.8
+    wheel_joint_torque_limit: 40
     action_scale_pos: 0.5
     decimation: 10
-    user_torque_limit: 60
+    user_torque_limit: 80
 
   normalization:
     clip_scales:
@@ -38,9 +44,10 @@ PointfootCfg:
       dof_vel: 0.05
 
   size:
-    actions_size: 6
-    observations_size: 27
+    actions_size: 8
+    observations_size: 31
     commands_size: 3
+    jointpos_idxs: [0, 1, 2, 4, 5, 6]
 
   stand_mode:
     stand_duration: 1.0
