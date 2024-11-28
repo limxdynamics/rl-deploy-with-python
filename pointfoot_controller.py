@@ -371,9 +371,17 @@ class PointfootController:
           print(f"L1 + X: stop_controller...")
           self.start_controller = False
 
-        self.commands[0] = sensor_joy.axes[1] * 0.5
-        self.commands[1] = sensor_joy.axes[0] * 0.5
-        self.commands[2] = sensor_joy.axes[2] * 0.5
+        linear_x  = sensor_joy.axes[1]
+        linear_y  = sensor_joy.axes[0]
+        angular_z = sensor_joy.axes[2]
+
+        linear_x  = 1.0 if linear_x > 1.0 else (-1.0 if linear_x < -1.0 else linear_x)
+        linear_y  = 1.0 if linear_y > 1.0 else (-1.0 if linear_y < -1.0 else linear_y)
+        angular_z = 1.0 if angular_z > 1.0 else (-1.0 if angular_z < -1.0 else angular_z)
+
+        self.commands[0] = linear_x * 0.5
+        self.commands[1] = linear_y * 0.5
+        self.commands[2] = angular_z * 0.5
 
     # Callback function for receiving diagnostic data
     def robot_diagnostic_callback(self, diagnostic_value: datatypes.DiagnosticValue):
