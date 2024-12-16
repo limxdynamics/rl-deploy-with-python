@@ -116,6 +116,9 @@ class PointfootController:
           self.joint_pos_idxs = config['PointfootCfg']['size']['jointpos_idxs']
           self.wheel_joint_damping = config['PointfootCfg']['control']['wheel_joint_damping']
           self.wheel_joint_torque_limit = config['PointfootCfg']['control']['wheel_joint_torque_limit']
+        elif self.is_sole_foot:
+          self.ankle_joint_damping = config['PointfootCfg']['control']['ankle_joint_damping']
+          self.ankle_joint_torque_limit = config['PointfootCfg']['control']['ankle_joint_torque_limit']
 
         # Initialize joint angles based on the initial configuration
         self.init_joint_angles = np.zeros(len(self.joint_names))
@@ -212,6 +215,14 @@ class PointfootController:
                                       min(action_max / self.wheel_joint_damping, self.actions[i]))
                 velocity_des = self.actions[i] * self.wheel_joint_damping
                 self.set_joint_command(i, 0, velocity_des, 0, 0, self.wheel_joint_damping)
+            elif self.is_sole_foot:
+                action_min = joint_vel[i] - self.ankle_joint_torque_limit / self.ankle_joint_damping
+                action_max = joint_vel[i] + self.ankle_joint_torque_limit / self.ankle_joint_damping
+                self.last_actions[i] = self.actions[i]
+                self.actions[i] = max(action_min / self.ankle_joint_damping,
+                                      min(action_max / self.ankle_joint_damping, self.actions[i]))
+                velocity_des = self.actions[i] * self.ankle_joint_damping
+                self.set_joint_command(i, 0, velocity_des, 0, 0, self.ankle_joint_damping)
 
     def compute_observation(self):
         # Convert IMU orientation from quaternion to Euler angles (ZYX convention)
