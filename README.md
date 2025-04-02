@@ -80,11 +80,11 @@
 
 - 设置机器人类型
 
-  - 通过 Shell 命令 `tree -L 1 rl-deploy-with-python/model/pointfoot` 列出可用的机器人类型：
+  - 通过 Shell 命令 `tree -L 1 rl-deploy-with-python/controllers/model` 列出可用的机器人类型：
 
     ```
-    limx@limx:~$ tree -L 1 rl-deploy-with-python/model/pointfoot
-    rl-deploy-with-python/model/pointfoot
+    limx@limx:~$ tree -L 1 rl-deploy-with-python/controllers/model
+    rl-deploy-with-python/controllers/model
     ├── PF_P441A
     ├── PF_P441B
     ├── PF_P441C
@@ -104,7 +104,7 @@
 - 运行控制算法：
 
   ```
-  python rl-deploy-with-python/pointfoot_controller.py
+  python rl-deploy-with-python/main.py
   ```
 
 ## 3. 虚拟遥控器
