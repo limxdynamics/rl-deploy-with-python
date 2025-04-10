@@ -291,12 +291,12 @@ class PointfootController:
 
             # Update the flag to indicate that the first observation has been processed
             self.is_first_rec_obs = False
-        else:
-            # Shift the existing proprioceptive history buffer to the left
-            self.proprio_history_buffer[:-self.observations_size] = self.proprio_history_buffer[self.observations_size:]
 
-            # Add the current observation to the end of the proprioceptive history buffer
-            self.proprio_history_buffer[-self.observations_size:] = obs
+        # Shift the existing proprioceptive history buffer to the left
+        self.proprio_history_buffer[:-self.observations_size] = self.proprio_history_buffer[self.observations_size:]
+
+        # Add the current observation to the end of the proprioceptive history buffer
+        self.proprio_history_buffer[-self.observations_size:] = obs
 
         # Convert the proprioceptive history buffer to a numpy array
         self.proprio_history_vector = np.array(self.proprio_history_buffer)
