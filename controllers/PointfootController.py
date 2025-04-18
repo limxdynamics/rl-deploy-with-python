@@ -291,7 +291,7 @@ class PointfootController:
 
             # Update the flag to indicate that the first observation has been processed
             self.is_first_rec_obs = False
-
+        
         # Shift the existing proprioceptive history buffer to the left
         self.proprio_history_buffer[:-self.observations_size] = self.proprio_history_buffer[self.observations_size:]
 
