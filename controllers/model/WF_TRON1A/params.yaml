@@ -25,11 +25,11 @@ PointfootCfg:
 
   control:
     # PD Drive parameters:
-    stiffness: 40.0
-    damping: 2.0
+    stiffness: 42.0
+    damping: 2.5
     wheel_joint_damping: 0.8
     wheel_joint_torque_limit: 40
-    action_scale_pos: 0.5
+    action_scale_pos: 0.25
     decimation: 10
     user_torque_limit: 80
 
@@ -45,9 +45,11 @@ PointfootCfg:
 
   size:
     actions_size: 8
-    observations_size: 31
+    observations_size: 28 # 31
     commands_size: 3
+    obs_history_length: 10
     jointpos_idxs: [0, 1, 2, 4, 5, 6]
+    encoder_output_size: 3
 
   stand_mode:
     stand_duration: 1.0
