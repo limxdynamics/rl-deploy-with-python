@@ -105,6 +105,7 @@ class SolefootController:
         self.rl_cfg = config['PointfootCfg']['normalization']
         self.obs_scales = config['PointfootCfg']['normalization']['obs_scales']
         self.actions_size = config['PointfootCfg']['size']['actions_size']
+        self.commands_size = config['PointfootCfg']['size']['commands_size']
         self.observations_size = config['PointfootCfg']['size']['observations_size']
         self.obs_history_length = config['PointfootCfg']['size']['obs_history_length']
         self.encoder_output_size = config['PointfootCfg']['size']['encoder_output_size']
@@ -119,8 +120,8 @@ class SolefootController:
         self.actions = np.zeros(self.actions_size)
         self.observations = np.zeros(self.observations_size)
         self.last_actions = np.zeros(self.actions_size)
-        self.commands = np.zeros(3)  # command to the robot (e.g., velocity, rotation)
-        self.scaled_commands = np.zeros(3)
+        self.commands = np.zeros(self.commands_size)  # command to the robot (e.g., velocity, rotation)
+        self.scaled_commands = np.zeros(self.commands_size)
         self.base_lin_vel = np.zeros(3)  # base linear velocity
         self.base_position = np.zeros(3)  # robot base position
         self.loop_count = 0  # loop iteration count
@@ -265,7 +266,8 @@ class SolefootController:
         command_scaler = np.diag([
             self.user_cmd_cfg['lin_vel_x'],  # Scale factor for linear velocity in x direction
             self.user_cmd_cfg['lin_vel_y'],  # Scale factor for linear velocity in y direction
-            self.user_cmd_cfg['ang_vel_yaw']  # Scale factor for yaw (angular velocity)
+            self.user_cmd_cfg['ang_vel_yaw'],  # Scale factor for yaw (angular velocity)
+            1.0, 1.0
         ])
 
         # Apply scaling to the command inputs (velocity commands)
@@ -448,6 +450,8 @@ class SolefootController:
         self.commands[0] = linear_x * 0.5
         self.commands[1] = linear_y * 0.5
         self.commands[2] = angular_z * 0.5
+        self.commands[3] = 0.0
+        self.commands[4] = 0.0
 
     # Callback function for receiving diagnostic data
     def robot_diagnostic_callback(self, diagnostic_value: datatypes.DiagnosticValue):

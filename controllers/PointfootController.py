@@ -105,6 +105,7 @@ class PointfootController:
         self.rl_cfg = config['PointfootCfg']['normalization']
         self.obs_scales = config['PointfootCfg']['normalization']['obs_scales']
         self.actions_size = config['PointfootCfg']['size']['actions_size']
+        self.commands_size = config['PointfootCfg']['size']['commands_size']
         self.observations_size = config['PointfootCfg']['size']['observations_size']
         self.obs_history_length = config['PointfootCfg']['size']['obs_history_length']
         self.encoder_output_size = config['PointfootCfg']['size']['encoder_output_size']
@@ -119,8 +120,8 @@ class PointfootController:
         self.actions = np.zeros(self.actions_size)
         self.observations = np.zeros(self.observations_size)
         self.last_actions = np.zeros(self.actions_size)
-        self.commands = np.zeros(3)  # command to the robot (e.g., velocity, rotation)
-        self.scaled_commands = np.zeros(3)
+        self.commands = np.zeros(self.commands_size)  # command to the robot (e.g., velocity, rotation)
+        self.scaled_commands = np.zeros(self.commands_size)
         self.base_lin_vel = np.zeros(3)  # base linear velocity
         self.base_position = np.zeros(3)  # robot base position
         self.loop_count = 0  # loop iteration count
