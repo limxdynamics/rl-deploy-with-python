@@ -26,19 +26,9 @@ class PointfootController:
 
         # Load configuration settings from the YAML file
         self.load_config(self.config_file)
-
-        # Load the ONNX model and set up input and output names
-        self.policy_session = ort.InferenceSession(self.model_policy)
-        self.policy_input_names = [self.policy_session.get_inputs()[i].name for i in range(self.policy_session.get_inputs().__len__())]
-        self.policy_output_names = [self.policy_session.get_outputs()[i].name for i in range(self.policy_session.get_outputs().__len__())]
-        self.policy_input_shapes = [self.policy_session.get_inputs()[i].shape for i in range(self.policy_session.get_inputs().__len__())]
-        self.policy_output_shapes = [self.policy_session.get_outputs()[i].shape for i in range(self.policy_session.get_outputs().__len__())]
-
-        self.encoder_session = ort.InferenceSession(self.model_encoder)
-        self.encoder_input_names = [self.encoder_session.get_inputs()[i].name for i in range(self.encoder_session.get_inputs().__len__())]
-        self.encoder_output_names = [self.encoder_session.get_outputs()[i].name for i in range(self.encoder_session.get_outputs().__len__())]
-        self.encoder_input_shapes = [self.encoder_session.get_inputs()[i].shape for i in range(self.encoder_session.get_inputs().__len__())]
-        self.encoder_output_shapes = [self.encoder_session.get_outputs()[i].shape for i in range(self.encoder_session.get_outputs().__len__())]
+        
+        # Load the ONNX model
+        self.initialize_onnx_models()
 
         # Prepare robot command structure with default values for mode, q, dq, tau, Kp, Kd
         self.robot_cmd = datatypes.RobotCmd()
@@ -91,7 +81,37 @@ class PointfootController:
 
         # Flag indicating first received observation
         self.is_first_rec_obs = True
+    
+    def initialize_onnx_models(self):
+        # Configure ONNX Runtime session options to optimize CPU usage
+        session_options = ort.SessionOptions()
+        # Limit the number of threads used for parallel computation within individual operators
+        session_options.intra_op_num_threads = 1
+        # Limit the number of threads used for parallel execution of different operators
+        session_options.inter_op_num_threads = 1
+        # Enable all possible graph optimizations to improve inference performance
+        session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        # Disable CPU memory arena to reduce memory fragmentation
+        session_options.enable_cpu_mem_arena = False
+        # Disable memory pattern optimization to have more control over memory allocation
+        session_options.enable_mem_pattern = False
 
+        # Define execution providers to use CPU only, ensuring no GPU inference
+        cpu_providers = ['CPUExecutionProvider']
+        
+        # Load the ONNX model and set up input and output names
+        self.policy_session = ort.InferenceSession(self.model_policy, sess_options=session_options, providers=cpu_providers)
+        self.policy_input_names = [self.policy_session.get_inputs()[i].name for i in range(self.policy_session.get_inputs().__len__())]
+        self.policy_output_names = [self.policy_session.get_outputs()[i].name for i in range(self.policy_session.get_outputs().__len__())]
+        self.policy_input_shapes = [self.policy_session.get_inputs()[i].shape for i in range(self.policy_session.get_inputs().__len__())]
+        self.policy_output_shapes = [self.policy_session.get_outputs()[i].shape for i in range(self.policy_session.get_outputs().__len__())]
+
+        self.encoder_session = ort.InferenceSession(self.model_encoder, sess_options=session_options, providers=cpu_providers)
+        self.encoder_input_names = [self.encoder_session.get_inputs()[i].name for i in range(self.encoder_session.get_inputs().__len__())]
+        self.encoder_output_names = [self.encoder_session.get_outputs()[i].name for i in range(self.encoder_session.get_outputs().__len__())]
+        self.encoder_input_shapes = [self.encoder_session.get_inputs()[i].shape for i in range(self.encoder_session.get_inputs().__len__())]
+        self.encoder_output_shapes = [self.encoder_session.get_outputs()[i].shape for i in range(self.encoder_session.get_outputs().__len__())]
+    
     # Load the configuration from a YAML file
     def load_config(self, config_file):
         with open(config_file, 'r') as f:
